@@ -1,3 +1,48 @@
+# Meridian
+
+**Meridian** adalah agent otonom berbasis AI yang dirancang untuk mengelola likuiditas secara otomatis di **Meteora DLMM** (Dynamic Liquidity Market Maker) di blockchain Solana.
+
+## Apa itu Meridian?
+
+Meridian bekerja seperti seorang trader atau liquidity provider yang cerdas. Ia bisa:
+
+- Mencari pool-pool bagus secara otomatis
+- Men-deploy likuiditas ke posisi yang menguntungkan
+- Mengelola posisi yang sudah dibuka (claim fee, close, adjust)
+- Belajar dari hasil posisi sebelumnya untuk meningkatkan performa di masa depan
+
+Agent ini menggunakan pendekatan **ReAct** (Reasoning + Acting), di mana LLM berpikir langkah demi langkah sebelum mengambil keputusan on-chain. Selain itu, Meridian juga memiliki sistem **HiveMind** yang memungkinkan beberapa agent saling berbagi pelajaran.
+
+## Fitur Utama
+
+- Fully autonomous (bisa jalan sendiri tanpa intervensi manual)
+- Non-custodial (private key tetap di tangan kamu)
+- Mendukung berbagai LLM Provider (SwiftRouter, OpenRouter, OpenAI, Local, dll)
+- Memiliki sistem retry yang lebih stabil
+- Dilengkapi CLI yang powerful untuk monitoring dan kontrol manual
+- Bisa belajar dan meningkatkan strategi seiring waktu
+
+## Mulai Cepat
+
+```bash
+# Clone repository
+git clone https://github.com/muhifni/meridian.git
+cd meridian
+
+# Install dependencies
+npm install
+
+# Jalankan setup wizard
+npm run setup
+
+# Jalankan agent
+npm start
+```
+
+Lihat bagian di bawah untuk penjelasan lebih lengkap.
+
+---
+
 ## Menggunakan LLM Provider Lain (SwiftRouter, OpenAI, Local, dll)
 
 Meridian tidak terbatas hanya bisa pakai OpenRouter. Kamu bisa menggunakan **SwiftRouter**, OpenAI, Groq, Together AI, atau bahkan model lokal (seperti LM Studio atau Ollama).
