@@ -41,14 +41,17 @@ The harness also keeps a structured decision log in `decision-log.json` for depl
 - Pool screening API — fee/TVL ratios, volume, organic scores, holder counts
 - Jupiter API — token audit, mcap, launchpad, price stats
 
-Agents are powered via **OpenRouter** and can be swapped for any compatible model.
+Agents are powered via **any OpenAI-compatible LLM provider** (OpenRouter, SwiftRouter, LM Studio, etc).
 
 ---
 
 ## Requirements
 
 - Node.js 18+
-- [OpenRouter](https://openrouter.ai) API key
+- LLM API key from any **OpenAI-compatible provider**:
+  - [OpenRouter](https://openrouter.ai) (recommended)
+  - [SwiftRouter](https://swiftrouter.com) — free tier available
+  - Local models via [LM Studio](https://lmstudio.ai) or Ollama
 - Solana wallet (base58 private key)
 - Solana RPC endpoint ([Helius](https://helius.xyz) recommended)
 - Telegram bot token (optional)
@@ -81,7 +84,21 @@ Create `.env`:
 ```env
 WALLET_PRIVATE_KEY=your_base58_private_key
 RPC_URL=https://mainnet.helius-rpc.com/?api-key=YOUR_KEY
+
+# LLM Provider (choose one)
+# A. OpenRouter
 OPENROUTER_API_KEY=sk-or-...
+
+# B. SwiftRouter
+# LLM_BASE_URL=https://api.swiftrouter.com/v1
+# LLM_API_KEY=sk-...
+# LLM_MODEL=your-model
+
+# C. Local (LM Studio)
+# LLM_BASE_URL=http://localhost:1234/v1
+# LLM_API_KEY=lm-studio
+# LLM_MODEL=local-model-name
+
 HELIUS_API_KEY=your_helius_key          # for wallet balance lookups
 TELEGRAM_BOT_TOKEN=123456:ABC...        # optional — for notifications + chat
 TELEGRAM_CHAT_ID=                       # auto-filled on first message
@@ -215,7 +232,6 @@ To trigger an agent directly, just describe what you want:
 #### Loop mode
 
 Run screening or management on a timer inside Claude Code:
-
 ```
 /loop 30m /screen     # screen every 30 minutes
 /loop 10m /manage     # manage every 10 minutes
@@ -471,6 +487,40 @@ All fields are optional — defaults shown. Edit `user-config.json`.
 
 ---
 
+## Using different LLM providers
+
+Meridian works with **any OpenAI-compatible API**.
+
+### OpenRouter (default)
+```env
+OPENROUTER_API_KEY=sk-or-...
+```
+
+### SwiftRouter
+```env
+LLM_BASE_URL=https://api.swiftrouter.com/v1
+LLM_API_KEY=sk-your-swiftrouter-key
+LLM_MODEL=your-model-id          # contoh: gpt-4o, claude-3-5-sonnet, dll.
+```
+
+### Local models (LM Studio / Ollama)
+```env
+LLM_BASE_URL=http://localhost:1234/v1
+LLM_API_KEY=lm-studio
+LLM_MODEL=your-local-model
+```
+
+You can also set per-role models in `user-config.json`:
+```json
+{
+  "managementModel": "openrouter/healer-alpha",
+  "screeningModel": "openrouter/hunter-alpha",
+  "generalModel": "anthropic/claude-3-5-sonnet"
+}
+```
+
+---
+
 ## Telegram
 
 **Setup:**
@@ -594,21 +644,6 @@ strategy-library.js Saved LP strategies
 telegram.js         Telegram bot: polling + notifications
 hivemind.js         Agent Meridian HiveMind sync
 smart-wallets.js    KOL/alpha wallet tracker
-token-blacklist.js  Permanent token blacklist
-cli.js              Direct CLI — every tool as a subcommand with JSON output
-
-tools/
-  definitions.js    Tool schemas (OpenAI format)
-  executor.js       Tool dispatch + safety checks
-  dlmm.js           Meteora DLMM SDK wrapper
-  screening.js      Pool discovery
-  wallet.js         SOL/token balances + Jupiter swap
-  token.js          Token info, holders, narrative
-  study.js          Top LPer study via LPAgent API
-
-discord-listener/
-  index.js          Selfbot Discord listener
-  pre-checks.js     Signal pre-check pipeline
 
 .claude/
   agents/
@@ -618,7 +653,7 @@ discord-listener/
     screen.md       /screen slash command
     manage.md       /manage slash command
     balance.md      /balance slash command
-    positions.md    /positions slash command
+    positions.md      /positions slash command
     candidates.md   /candidates slash command
     study-pool.md   /study-pool slash command
     pool-ohlcv.md   /pool-ohlcv slash command
