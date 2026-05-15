@@ -32,4 +32,13 @@ meridian models --provider swiftrouter --tool-calling
 - `gemini-2.5-pro`
 - `deepseek-r1-0528`
 
-Kami sudah membuat Meridian lebih stabil saat pakai berbagai provider.
+### Kami Sudah Membuat Retry Lebih Pintar
+
+Kami memperbaiki cara Meridian berkomunikasi dengan LLM supaya lebih stabil:
+
+- Kalau LLM error atau lambat, otomatis mencoba ulang dengan jeda yang semakin lama (exponential backoff).
+- Lebih pintar membedakan error yang bisa dicoba lagi dan yang tidak bisa.
+- Kalau gagal terus, otomatis pindah ke model cadangan.
+- Bisa handle model yang suka mikir dulu (seperti yang ngasih tag `<think>`).
+
+Jadi agent kamu lebih jarang error meskipun pakai provider yang berbeda-beda.
