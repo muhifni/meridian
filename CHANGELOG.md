@@ -2,36 +2,21 @@
 
 Semua perubahan penting pada proyek Meridian akan didokumentasikan di file ini.
 
-Format mengikuti [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), dan versi mengikuti [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
-
----
-
-## [1.1.0] - 2026-05-15
+## [1.2.0] - 2026-05-15
 
 ### Added
-- Dukungan resmi **SwiftRouter** sebagai LLM Provider
-- Perintah CLI baru: `meridian models --provider swiftrouter`
-- Flag `--tool-calling` pada perintah models (hanya menampilkan model yang bagus untuk tool calling)
-- SwiftRouter ditambahkan ke Setup Wizard (`npm run setup`)
-
-### Improved
-- **Retry Logic** yang jauh lebih baik:
-  - Menggunakan Exponential Backoff + Jitter
-  - Lebih pintar membedakan error yang bisa dicoba ulang dan yang tidak
-  - Otomatis fallback ke model cadangan jika gagal terus
-- Penanganan response dari model reasoning (seperti MiniMax) yang mengembalikan `reasoning_content` dan tag `<think>`
-- Stabilitas saat menggunakan provider LLM selain OpenRouter
+- **utils/lessonManager.js**: Sistem Lesson Scoring + Auto-Pruning untuk HiveMind
+  - Scoring otomatis berdasarkan outcome performa selanjutnya
+  - Auto-prune lesson dengan score rendah atau sudah terlalu lama
+  - Feedback loop agar swarm learning semakin cerdas (Darwinian)
+  - Fungsi `applyPerformanceFeedback`, `pruneLessons`, `runMaintenance`
 
 ### Changed
-- Dokumentasi README.md disederhanakan agar lebih mudah dipahami pemula
-- CLAUDE.md diperbarui dengan penjelasan teknis retry logic dan message normalization
+- `lessons.js`: Integrasi dasar dengan lessonManager (inisialisasi score + periodic prune + feedback)
+- Version bump ke 1.2.0
 
 ### Technical
-- Membuat file `utils/llm.js` sebagai wrapper retry yang reusable
-- Menambahkan konfigurasi `llm.maxRetries` dan `llm.retryBaseDelayMs` di `config.js`
+- Backward compatible: lesson lama otomatis mendapat score default
+- Pruning aman: pinned + high-score + recent lessons dilindungi
 
----
-
-## [1.0.0] - Initial Release
-
-- Rilis awal proyek Meridian (fork dari yunus-0x/meridian)
+Lihat `utils/lessonManager.js` untuk detail implementasi scoring & pruning.
