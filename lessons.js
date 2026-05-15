@@ -11,6 +11,7 @@ import path from "path";
 import { fileURLToPath } from "url";
 import { log } from "./logger.js";
 import { getSharedLessonsForPrompt, pushHiveLesson, pushHivePerformanceEvent } from "./hivemind.js";
+import { initializeLessonScore, applyPerformanceFeedback, pruneLessons, runMaintenance } from "./utils/lessonManager.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const USER_CONFIG_PATH = path.join(__dirname, "user-config.json");
@@ -119,9 +120,10 @@ export async function recordPerformance(perf) {
 
   data.performance.push(entry);
 
-  // Derive and store a lesson
-  const lesson = derivLesson(entry);
+  // Derive and store a lesson (now with scoring)
+  let lesson = derivLesson(entry);
   if (lesson) {
+    lesson = initializeLessonScore(lesson, lesson.outcome);
     data.lessons.push(lesson);
     log("lessons", `New lesson: ${lesson.rule}`);
   }
@@ -129,6 +131,16 @@ export async function recordPerformance(perf) {
   save(data);
   if (lesson) {
     void pushHiveLesson(lesson);
+  }
+
+  // Apply scoring feedback to relevant existing lessons
+  if (data.lessons.length > 0) {
+    applyPerformanceFeedback(entry, data.lessons.slice(-8));
+  }
+
+  // Auto-prune every 8 closes
+  if (data.performance.length % 8 === 0) {
+    runMaintenance();
   }
 
   // Update pool-level memory

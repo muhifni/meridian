@@ -322,6 +322,19 @@ export function getTrackedPosition(position_address) {
 }
 
 /**
+ * Get all tracked positions.
+ * @param {boolean} openOnly - If true, only return non-closed positions
+ */
+export function getTrackedPositions(openOnly = false) {
+  const state = load();
+  const positions = Object.values(state.positions);
+  if (openOnly) {
+    return positions.filter((p) => !p.closed);
+  }
+  return positions;
+}
+
+/**
  * Summarize state for the agent system prompt.
  */
 export function getStateSummary() {

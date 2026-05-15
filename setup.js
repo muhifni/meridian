@@ -152,11 +152,6 @@ console.log("── API Keys & Wallet ──────────────
 
 const alreadySet = (val) => val ? "*** (already set — Enter to keep)" : "";
 
-const openrouterKey = await ask(
-  "OpenRouter API key (sk-or-...)",
-  alreadySet(ev("OPENROUTER_API_KEY", ""))
-);
-
 const walletKey = await ask(
   "Wallet private key (base58)",
   alreadySet(ev("WALLET_PRIVATE_KEY", existingConfig.walletKey || ""))
@@ -407,12 +402,13 @@ const isKept = (val) => !val || val.startsWith("***");
 
 const envMap = {
   ...existingEnv,
-  ...(isKept(openrouterKey) ? {} : { OPENROUTER_API_KEY: openrouterKey }),
   ...(isKept(walletKey)     ? {} : { WALLET_PRIVATE_KEY: walletKey }),
   ...(rpcUrl                ? { RPC_URL: rpcUrl } : {}),
   ...(isKept(heliusKey)     ? {} : { HELIUS_API_KEY: heliusKey }),
   ...(isKept(telegramToken) ? {} : { TELEGRAM_BOT_TOKEN: telegramToken }),
   ...(telegramChatId        ? { TELEGRAM_CHAT_ID: telegramChatId } : {}),
+  // LLM API key: save to .env for backward compatibility
+  ...(llmApiKey && !llmApiKey.startsWith("***") ? { OPENROUTER_API_KEY: llmApiKey, LLM_API_KEY: llmApiKey } : {}),
   DRY_RUN: dryRun ? "true" : "false",
 };
 fs.writeFileSync(ENV_PATH, buildEnv(envMap));

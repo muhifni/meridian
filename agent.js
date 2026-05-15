@@ -242,6 +242,15 @@ export async function agentLoop(goal, maxSteps = config.llm.maxSteps, sessionHis
         throw new Error(`API returned no choices: ${response.error?.message || JSON.stringify(response)}`);
       }
       const msg = response.choices[0].message;
+
+      // Handle SwiftRouter / reasoning models that return extra fields
+      if (msg.reasoning_content) {
+        log("agent", `Reasoning content received (${msg.reasoning_content.length} chars)`);
+      }
+      if (msg.content && msg.content.includes("<think>")) {
+        msg.content = msg.content.replace(/<think>[\s\S]*?<\/think>/g, "").trim();
+      }
+
       const invalidToolArgErrors = new Map();
       // Keep tool-call history API-valid, but never execute unrecoverable args.
       if (msg.tool_calls) {

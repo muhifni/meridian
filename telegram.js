@@ -83,24 +83,39 @@ export function isEnabled() {
   return !!TOKEN;
 }
 
-async function postTelegram(method, body) {
+async function postTelegram(method, body, retries = 3) {
   if (!TOKEN || !chatId) return null;
-  try {
-    const res = await fetch(`${BASE}/${method}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ chat_id: chatId, ...body }),
-    });
-    if (!res.ok) {
-      const err = await res.text();
-      log("telegram_error", `${method} ${res.status}: ${err.slice(0, 200)}`);
+  for (let attempt = 0; attempt < retries; attempt++) {
+    try {
+      const res = await fetch(`${BASE}/${method}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ chat_id: chatId, ...body }),
+        signal: AbortSignal.timeout(15_000),
+      });
+      if (!res.ok) {
+        const err = await res.text();
+        if (res.status === 429) {
+          // Rate limited - wait and retry
+          const retryAfter = parseInt(err.match(/retry_after":(\d+)/)?.[1] || "5");
+          log("telegram_warn", `Rate limited, retry after ${retryAfter}s`);
+          await sleep(retryAfter * 1000);
+          continue;
+        }
+        log("telegram_error", `${method} ${res.status}: ${err.slice(0, 200)}`);
+        return null;
+      }
+      return await res.json();
+    } catch (e) {
+      if (attempt < retries - 1) {
+        await sleep(2000 * (attempt + 1));
+        continue;
+      }
+      log("telegram_error", `${method} failed after ${retries} attempts: ${e.message}`);
       return null;
     }
-    return await res.json();
-  } catch (e) {
-    log("telegram_error", `${method} failed: ${e.message}`);
-    return null;
   }
+  return null;
 }
 
 async function postTelegramRaw(method, body) {
@@ -141,7 +156,7 @@ export async function sendHTML(html) {
   return postTelegram("sendMessage", { text: html.slice(0, 4096), parse_mode: "HTML" });
 }
 
-async function editMessage(text, messageId) {
+export async function editMessage(text, messageId) {
   if (!TOKEN || !chatId || !messageId) return null;
   return postTelegram("editMessageText", {
     message_id: messageId,
@@ -346,13 +361,24 @@ export async function createLiveMessage(title, intro = "Starting...") {
 
 // ─── Long polling ────────────────────────────────────────────────
 async function poll(onMessage) {
+  let consecutiveErrors = 0;
   while (_polling) {
     try {
+      // Use shorter timeout (10s) to avoid connection drops
       const res = await fetch(
-        `${BASE}/getUpdates?offset=${_offset}&timeout=30`,
-        { signal: AbortSignal.timeout(35_000) }
+        `${BASE}/getUpdates?offset=${_offset}&timeout=10`,
+        { signal: AbortSignal.timeout(15_000) }
       );
-      if (!res.ok) { await sleep(5000); continue; }
+      if (!res.ok) {
+        consecutiveErrors++;
+        const delay = Math.min(3000 * consecutiveErrors, 30000);
+        if (consecutiveErrors <= 3) {
+          log("telegram_warn", `Poll HTTP ${res.status}, retry in ${delay/1000}s`);
+        }
+        await sleep(delay);
+        continue;
+      }
+      consecutiveErrors = 0;
       const data = await res.json();
       for (const update of data.result || []) {
         _offset = update.update_id + 1;
@@ -380,9 +406,16 @@ async function poll(onMessage) {
       }
     } catch (e) {
       if (!e.message?.includes("aborted")) {
-        log("telegram_error", `Poll error: ${e.message}`);
+        consecutiveErrors++;
+        // Only log first few errors to avoid spam
+        if (consecutiveErrors <= 3) {
+          log("telegram_error", `Poll error: ${e.message}`);
+        }
+        await sleep(Math.min(3000 * consecutiveErrors, 30000));
+        continue;
       }
-      await sleep(5000);
+      // Aborted (timeout) - normal, just continue
+      await sleep(500);
     }
   }
 }
