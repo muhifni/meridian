@@ -1,10 +1,13 @@
 import { rateLimitedDataPiFetch } from "../utils/datapi-limiter.js";
+import { searchTokenOfficial, mapOfficialToScreening } from "./jupiter-official.js";
+import { log } from "../logger.js";
 
 const DATAPI_BASE = "https://datapi.jup.ag/v1";
 
 /**
  * Get the narrative/story behind a token from Jupiter ChainInsight.
  * Useful for understanding if a token has a real community/theme vs nothing.
+ * NOTE: No official alternative — still uses datapi.jup.ag with rate limiter.
  */
 export async function getTokenNarrative({ mint }) {
   const res = await rateLimitedDataPiFetch(`${DATAPI_BASE}/chaininsight/narrative/${mint}`);
@@ -19,11 +22,47 @@ export async function getTokenNarrative({ mint }) {
 
 /**
  * Search for token data by name, symbol, or mint address.
- * Returns condensed token info useful for confidence scoring.
+ * Primary: official Jupiter Tokens v2 API (api.jup.ag with API key)
+ * Fallback: datapi.jup.ag (rate limited)
  */
 export async function getTokenInfo({ query }) {
+  // Try official API first
+  try {
+    const tokens = await searchTokenOfficial({ query });
+    if (tokens.length > 0) {
+      const results = tokens.slice(0, 5).map(mapOfficialToScreening);
+      // Enrich first result with OKX smart money + risk data
+      if (results[0]?.mint) {
+        const { getAdvancedInfo, getClusterList } = await import("./okx.js");
+        const [adv, clusters] = await Promise.all([
+          getAdvancedInfo(results[0].mint).catch(() => null),
+          getClusterList(results[0].mint).catch(() => []),
+        ]);
+        if (adv) {
+          results[0].risk_level      = adv.risk_level;
+          results[0].bundle_pct      = adv.bundle_pct;
+          results[0].sniper_pct      = adv.sniper_pct;
+          results[0].suspicious_pct  = adv.suspicious_pct;
+          results[0].new_wallet_pct  = adv.new_wallet_pct;
+          results[0].smart_money_buy = adv.smart_money_buy;
+          results[0].tags            = adv.tags;
+        }
+        if (clusters?.length) {
+          results[0].kol_in_clusters   = clusters.some((c) => c.has_kol);
+          results[0].top_cluster_trend = clusters[0]?.trend ?? null;
+          results[0].clusters          = clusters;
+        }
+      }
+      return { found: true, query, results };
+    }
+    return { found: false, query };
+  } catch (e) {
+    log("token_warn", `Official Jupiter API failed for ${query}, falling back to datapi: ${e.message}`);
+  }
+
+  // Fallback to datapi.jup.ag (rate limited)
   const url = `${DATAPI_BASE}/assets/search?query=${encodeURIComponent(query)}`;
-  const res = await fetch(url);
+  const res = await rateLimitedDataPiFetch(url);
   if (!res.ok) throw new Error(`Token search API error: ${res.status}`);
   const data = await res.json();
   const tokens = Array.isArray(data) ? data : [data];
@@ -56,11 +95,10 @@ export async function getTokenInfo({ query }) {
       buyers: t.stats1h.numOrganicBuyers,
       net_buyers: t.stats1h.numNetBuyers,
     } : null,
-    // stats_24h omitted — misleading for short-timeframe LP (reflects full pump history)
-    stats_24h_net_buyers: t.stats24h ? t.stats24h.numNetBuyers : null, // keep only net buyer direction
+    stats_24h_net_buyers: t.stats24h ? t.stats24h.numNetBuyers : null,
   }));
 
-  // Enrich first result with OKX smart money + risk data (public endpoint, no key needed)
+  // Enrich first result with OKX smart money + risk data
   if (results[0]?.mint) {
     const { getAdvancedInfo, getClusterList } = await import("./okx.js");
     const [adv, clusters] = await Promise.all([
