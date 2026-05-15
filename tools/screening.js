@@ -5,6 +5,7 @@ import { log } from "../logger.js";
 import { isBaseMintOnCooldown, isPoolOnCooldown } from "../pool-memory.js";
 import { confirmIndicatorPreset } from "./chart-indicators.js";
 import { getAgentMeridianBase, getAgentMeridianHeaders } from "./agent-meridian.js";
+import { searchTokenOfficial, mapOfficialToScreening } from "./jupiter-official.js";
 
 import { rateLimitedDataPiFetch } from "../utils/datapi-limiter.js";
 
@@ -223,6 +224,14 @@ async function applyVolatilityTimeframe(rawPools, sourceTimeframe) {
 }
 
 async function searchAssetsBySymbol(symbol) {
+  // Try official Jupiter API first (has API key, no rate limit issues)
+  try {
+    const tokens = await searchTokenOfficial({ query: symbol });
+    if (tokens.length > 0) return tokens;
+  } catch (e) {
+    log("screening_warn", `Official API failed for ${symbol}, falling back: ${e.message}`);
+  }
+  // Fallback to datapi.jup.ag
   const res = await rateLimitedDataPiFetch(`${DATAPI_JUP}/assets/search?query=${encodeURIComponent(symbol)}`);
   if (!res.ok) throw new Error(`assets/search ${res.status}`);
   const data = await res.json();
@@ -457,10 +466,9 @@ export async function discoverPools({
     if (missingDev.length > 0) {
       const devResults = await Promise.allSettled(
         missingDev.map((p) =>
-          rateLimitedDataPiFetch(`${DATAPI_JUP}/assets/search?query=${p.base.mint}`)
-            .then((r) => r.ok ? r.json() : null)
-            .then((d) => {
-              const t = Array.isArray(d) ? d[0] : d;
+          searchTokenOfficial({ query: p.base.mint })
+            .then((tokens) => {
+              const t = Array.isArray(tokens) ? tokens[0] : tokens;
               return { pool: p.pool, dev: t?.dev || null };
             })
             .catch(() => ({ pool: p.pool, dev: null }))

@@ -25,13 +25,10 @@ function getWallet() {
   return _wallet;
 }
 
+import { fetchWithJupiterKey } from "../utils/jupiter-keys.js";
+
 const JUPITER_PRICE_API = "https://api.jup.ag/price/v3";
 const JUPITER_SWAP_V2_API = "https://api.jup.ag/swap/v2";
-const DEFAULT_JUPITER_API_KEY = "b15d42e9-e0e4-4f90-a424-ae41ceeaa382";
-
-function getJupiterApiKey() {
-  return config.jupiter.apiKey || process.env.JUPITER_API_KEY || DEFAULT_JUPITER_API_KEY;
-}
 
 function getJupiterReferralParams() {
   const referralAccount = String(config.jupiter.referralAccount || "").trim();
@@ -184,11 +181,8 @@ export async function swapToken({
       search.set("referralFee", String(referralParams.referralFee));
     }
     const orderUrl = `${JUPITER_SWAP_V2_API}/order?${search.toString()}`;
-    const jupiterApiKey = getJupiterApiKey();
 
-    const orderRes = await fetch(orderUrl, {
-      headers: jupiterApiKey ? { "x-api-key": jupiterApiKey } : {},
-    });
+    const orderRes = await fetchWithJupiterKey(orderUrl);
     if (!orderRes.ok) {
       const body = await orderRes.text();
       throw new Error(`Swap V2 order failed: ${orderRes.status} ${body}`);
@@ -207,12 +201,9 @@ export async function swapToken({
     const signedTx = Buffer.from(tx.serialize()).toString("base64");
 
     // ─── Execute ───────────────────────────────────────────────
-    const execRes = await fetch(`${JUPITER_SWAP_V2_API}/execute`, {
+    const execRes = await fetchWithJupiterKey(`${JUPITER_SWAP_V2_API}/execute`, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        ...(jupiterApiKey ? { "x-api-key": jupiterApiKey } : {}),
-      },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ signedTransaction: signedTx, requestId }),
     });
     if (!execRes.ok) {

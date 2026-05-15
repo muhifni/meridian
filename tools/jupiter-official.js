@@ -8,14 +8,9 @@
  *   datapi.jup.ag/v1/chaininsight     → No official alternative (kept as-is with rate limiter)
  */
 
-import { config } from "../config.js";
+import { fetchWithJupiterKey } from "../utils/jupiter-keys.js";
 
 const JUPITER_TOKENS_V2 = "https://api.jup.ag/tokens/v2";
-
-function getHeaders() {
-  const key = config.jupiter?.apiKey || process.env.JUPITER_API_KEY || "";
-  return key ? { "x-api-key": key } : {};
-}
 
 /**
  * Search token by mint address or symbol using official Jupiter Tokens API.
@@ -23,7 +18,7 @@ function getHeaders() {
  */
 export async function searchTokenOfficial({ query }) {
   const url = `${JUPITER_TOKENS_V2}/tag?query=${encodeURIComponent(query)}`;
-  const res = await fetch(url, { headers: getHeaders() });
+  const res = await fetchWithJupiterKey(url);
   if (!res.ok) throw new Error(`Jupiter Tokens v2 error: ${res.status}`);
   const data = await res.json();
   const tokens = Array.isArray(data) ? data : [data];
