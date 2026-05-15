@@ -8,7 +8,7 @@ Autonomous DLMM liquidity provider agent for Meteora pools on Solana.
 
 ```
 index.js            Main entry: REPL + cron orchestration + Telegram bot polling
-agent.js            ReAct loop (OpenRouter/OpenAI-compatible): LLM → tool call → repeat
+agent.js            ReAct loop (OpenAI-compatible): LLM → tool call → repeat
 config.js           Runtime config from user-config.json + .env; exposes config object
 prompt.js           Builds system prompt per agent role (SCREENER / MANAGER / GENERAL)
 state.js            Position registry (state.json): tracks bin ranges, OOR timestamps, notes
@@ -22,15 +22,35 @@ smart-wallets.js    KOL/alpha wallet tracker (smart-wallets.json)
 token-blacklist.js  Permanent token blacklist (token-blacklist.json)
 logger.js           Daily-rotating log files + action audit trail
 
-tools/
-  definitions.js    Tool schemas in OpenAI format (what LLM sees)
-  executor.js       Tool dispatch: name → fn, safety checks, pre/post hooks
-  dlmm.js           Meteora DLMM SDK wrapper (deploy, close, claim, positions, PnL)
-  screening.js      Pool discovery from Meteora API
-  wallet.js         SOL/token balances (Helius) + Jupiter swap
-  token.js          Token info/holders/narrative (Jupiter API)
-  study.js          Top LPer study via LPAgent API
+utils/llm.js        Robust retry wrapper with exponential backoff + jitter for LLM calls
+
+.claude/
+  agents/           Claude Code sub-agents (screener.md, manager.md)
+  commands/         Slash command definitions
 ```
+
+---
+
+## LLM Provider Support
+
+Meridian works with **any OpenAI-compatible provider**:
+
+- **OpenRouter** (default)
+- **SwiftRouter** (`https://api.swiftrouter.com/v1`) — recommended for Claude, Gemini, MiniMax models
+- MiniMax, OpenAI, Groq, Together, Fireworks, etc.
+- Local models (LM Studio, Ollama, etc.)
+
+Key environment variables:
+- `LLM_BASE_URL`
+- `LLM_API_KEY`
+- `LLM_MODEL`
+
+The setup wizard (`npm run setup`) now includes **SwiftRouter** as a first-class option.
+
+**Message normalization** in `agent.js` handles:
+- `reasoning_content` field
+- `<think>...</think>` tags (common in MiniMax/M1)
+- Extra fields from various providers
 
 ---
 
@@ -44,7 +64,7 @@ Three agent roles filter which tools the LLM can call:
 | `MANAGER` | Manage open positions | close_position, claim_fees, swap_token, get_position_pnl, set_position_note |
 | `GENERAL` | Chat / manual commands | All tools |
 
-Sets defined in `agent.js:6-7`. If you add a tool, also add it to the relevant set(s).
+Sets defined in `agent.js`. If you add a tool, also add it to the relevant set(s).
 
 ---
 
@@ -178,13 +198,14 @@ const actualBaseFee = baseFactor > 0
 
 ---
 
-## Model Configuration
+## Model Configuration & Retry Logic
 
-- Default model: `process.env.LLM_MODEL` or `openrouter/healer-alpha`
-- Fallback on 502/503/529: `stepfun/step-3.5-flash:free` (2nd attempt), then retry
-- Per-role models: `managementModel`, `screeningModel`, `generalModel` in user-config.json
-- LM Studio: set `LLM_BASE_URL=http://localhost:1234/v1` and `LLM_API_KEY=lm-studio`
-- `maxOutputTokens` minimum: 2048 (free models may have lower limits causing empty responses)
+- Uses `utils/llm.js` → `createChatCompletionWithRetry()` with **exponential backoff + jitter**
+- Retries on: 429, 5xx, network errors, timeouts
+- Does **not** retry on client errors (4xx except rate limit)
+- Fallback model on persistent failure: `stepfun/step-3.5-flash:free`
+- Per-role models supported via `user-config.json`
+- Local models: set `LLM_BASE_URL` + `LLM_API_KEY=lm-studio`
 
 ---
 
@@ -210,19 +231,17 @@ Agent Meridian HiveMind sync is handled by `hivemind.js`. It uses built-in Agent
 |-----|----------|---------|
 | `WALLET_PRIVATE_KEY` | Yes | Base58 or JSON array private key |
 | `RPC_URL` | Yes | Solana RPC endpoint |
-| `OPENROUTER_API_KEY` | Yes | LLM API key |
-| `TELEGRAM_BOT_TOKEN` | No | Telegram notifications |
-| `TELEGRAM_CHAT_ID` | No | Telegram chat target |
-| `LLM_BASE_URL` | No | Override for local LLM (e.g. LM Studio) |
-| `LLM_MODEL` | No | Override default model |
+| `OPENROUTER_API_KEY` | Yes | LLM API key (legacy) |
+| `LLM_BASE_URL` | No | Base URL for any OpenAI-compatible provider (SwiftRouter, etc) |
+| `LLM_API_KEY` | No | API key for the chosen provider |
+| `LLM_MODEL` | No | Model name |
 | `DRY_RUN` | No | Skip all on-chain transactions |
-| `HIVE_MIND_URL` | No | Collective intelligence server |
-| `HIVE_MIND_API_KEY` | No | Hive mind auth token |
+| `TELEGRAM_BOT_TOKEN` | No | Telegram notifications |
 | `HELIUS_API_KEY` | No | Enhanced wallet balance data |
 
 ---
 
 ## Known Issues / Tech Debt
 
-- `lessons.js evolveThresholds()` evolves `maxVolatility` + `minFeeTvlRatio` (wrong key names — should be `minFeeActiveTvlRatio`; `maxVolatility` doesn't exist in config at all). The evolution is a no-op for those keys.
-- `get_wallet_positions` tool (dlmm.js) is in definitions.js but not in MANAGER_TOOLS or SCREENER_TOOLS — only available in GENERAL role.
+- `lessons.js evolveThresholds()` evolves `maxVolatility` + `minFeeTvlRatio` (wrong key names). The evolution is currently a no-op.
+- `get_wallet_positions` tool is defined but only available in GENERAL role.
