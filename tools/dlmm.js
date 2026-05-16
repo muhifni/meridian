@@ -572,7 +572,10 @@ export async function deployPosition({
 
   if (process.env.DRY_RUN === "true") {
     return {
+      success: true,
       dry_run: true,
+      position: `dry_run_${Date.now()}`,
+      pool_name: pool_address.slice(0, 8),
       would_deploy: {
         pool_address,
         strategy: activeStrategy,
@@ -584,7 +587,7 @@ export async function deployPosition({
         amount_y: finalAmountY,
         wide_range: totalBins > 69,
       },
-      message: "DRY RUN — no transaction sent",
+      message: "DRY RUN — no transaction sent. Deploy recorded as successful for simulation purposes. Do NOT call deploy_position again.",
     };
   }
 

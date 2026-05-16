@@ -2,6 +2,13 @@
 
 Semua perubahan penting pada proyek Meridian akan didokumentasikan di file ini.
 
+## [1.5.4] - 2026-05-17
+
+### Fixed
+- `tools/dlmm.js`: dry run `deploy_position` result sekarang include `success: true` dan `position` field sehingga LLM tidak mencoba deploy ulang karena mengira deploy gagal. Juga tambahkan instruksi eksplisit di `message` untuk tidak retry.
+
+---
+
 ## [1.5.3] - 2026-05-17
 
 ### Fixed
