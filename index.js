@@ -28,7 +28,7 @@ import { generateBriefing } from "./briefing.js";
 import { getLastBriefingDate, setLastBriefingDate, getTrackedPosition, getTrackedPositions, setPositionInstruction, updatePnlAndCheckExits, queuePeakConfirmation, resolvePendingPeak, queueTrailingDropConfirmation, resolvePendingTrailingDrop } from "./state.js";
 import { getActiveStrategy } from "./strategy-library.js";
 import { recordPositionSnapshot, recallForPool, addPoolNote } from "./pool-memory.js";
-import { checkSmartWalletsOnPool } from "./smart-wallets.js";
+import { checkSmartWalletsOnPool, listSmartWallets } from "./smart-wallets.js";
 import { evolveSmartWallets } from "./wallet-evolution.js";
 import { getTokenNarrative, getTokenInfo } from "./tools/token.js";
 import { stageSignals } from "./signal-tracker.js";
@@ -1289,6 +1289,7 @@ function formatHelpText() {
     "/screen — refresh deterministic candidate list",
     "/candidates — show latest cached candidates",
     "/deploy <n> — deploy candidate by cached index",
+    "/wallets — list tracked smart wallets",
     "/briefing — morning briefing",
     "/hive — HiveMind sync status",
     "/hive pull — manual HiveMind pull now",
@@ -1577,6 +1578,32 @@ async function telegramHandler(msg) {
 
   if (text === "/candidates") {
     await sendMessage(describeLatestCandidates(5)).catch(() => {});
+    return;
+  }
+
+  if (text === "/wallets") {
+    try {
+      const { wallets, total } = listSmartWallets();
+      if (total === 0) {
+        await sendMessage("No smart wallets tracked yet.\nUse the agent to add wallets via study data.").catch(() => {});
+        return;
+      }
+      const lines = wallets.map((w, i) => {
+        const source = w.source === "auto" ? "🤖" : "👤";
+        const stats  = w.stats
+          ? ` | wr ${(w.stats.win_rate * 100).toFixed(0)}% | ${w.stats.total_positions_observed}pos | avg+${w.stats.avg_pnl_pct?.toFixed(1)}%`
+          : "";
+        return `${i + 1}. ${source} ${w.name} (${w.category})\n   ${w.address.slice(0, 8)}...${w.address.slice(-4)}${stats}`;
+      });
+      const autoCount   = wallets.filter(w => w.source === "auto").length;
+      const manualCount = total - autoCount;
+      await sendMessage(
+        `👛 Smart Wallets (${total} total — 👤 ${manualCount} manual, 🤖 ${autoCount} auto)\n\n` +
+        lines.join("\n\n")
+      ).catch(() => {});
+    } catch (e) {
+      await sendMessage(`Error: ${e.message}`).catch(() => {});
+    }
     return;
   }
 
