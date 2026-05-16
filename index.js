@@ -1289,7 +1289,7 @@ function formatHelpText() {
     "/screen — refresh deterministic candidate list",
     "/candidates — show latest cached candidates",
     "/deploy <n> — deploy candidate by cached index",
-    "/wallets — list tracked smart wallets",
+    "/smart_wallets — list tracked smart wallets",
     "/briefing — morning briefing",
     "/hive — HiveMind sync status",
     "/hive pull — manual HiveMind pull now",
@@ -1581,7 +1581,7 @@ async function telegramHandler(msg) {
     return;
   }
 
-  if (text === "/wallets") {
+  if (text === "/smart_wallets") {
     try {
       const { wallets, total } = listSmartWallets();
       if (total === 0) {
