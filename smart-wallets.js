@@ -21,7 +21,7 @@ function saveWallets(data) {
 
 const SOLANA_PUBKEY_RE = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/;
 
-export function addSmartWallet({ name, address, category = "alpha", type = "lp" }) {
+export function addSmartWallet({ name, address, category = "alpha", type = "lp", source = "manual", stats = null }) {
   if (!SOLANA_PUBKEY_RE.test(address)) {
     return { success: false, error: "Invalid Solana address format" };
   }
@@ -30,10 +30,12 @@ export function addSmartWallet({ name, address, category = "alpha", type = "lp" 
   if (existing) {
     return { success: false, error: `Already tracked as "${existing.name}"` };
   }
-  data.wallets.push({ name, address, category, type, addedAt: new Date().toISOString() });
+  const entry = { name, address, category, type, source, addedAt: new Date().toISOString() };
+  if (stats) entry.stats = stats;
+  data.wallets.push(entry);
   saveWallets(data);
-  log("smart_wallets", `Added wallet: ${name} (${category}, type=${type})`);
-  return { success: true, wallet: { name, address, category, type } };
+  log("smart_wallets", `Added wallet: ${name} (${category}, type=${type}, source=${source})`);
+  return { success: true, wallet: { name, address, category, type, source } };
 }
 
 export function removeSmartWallet({ address }) {

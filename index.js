@@ -29,6 +29,7 @@ import { getLastBriefingDate, setLastBriefingDate, getTrackedPosition, getTracke
 import { getActiveStrategy } from "./strategy-library.js";
 import { recordPositionSnapshot, recallForPool, addPoolNote } from "./pool-memory.js";
 import { checkSmartWalletsOnPool } from "./smart-wallets.js";
+import { evolveSmartWallets } from "./wallet-evolution.js";
 import { getTokenNarrative, getTokenInfo } from "./tools/token.js";
 import { stageSignals } from "./signal-tracker.js";
 import { getWeightsSummary } from "./signal-weights.js";
@@ -712,6 +713,16 @@ IMPORTANT:
         summary: deployAttempted ? "Deploy attempt did not succeed" : "No successful deploy in screening cycle",
         reason: stripThink(content).slice(0, 500),
       });
+    }
+
+    // ── Wallet Evolution — discover new smart wallets, prune bad ones ──
+    // Run async in background so it never delays the screening report
+    const topPoolAddresses = passing.slice(0, 3).map(({ pool }) => pool.pool).filter(Boolean);
+    if (topPoolAddresses.length) {
+      evolveSmartWallets(topPoolAddresses).then((evo) => {
+        if (evo.added.length)   log("wallet_evo", `Auto-added: ${evo.added.join(", ")}`);
+        if (evo.removed.length) log("wallet_evo", `Auto-removed: ${evo.removed.join(", ")}`);
+      }).catch((e) => log("wallet_evo", `Evolution error: ${e.message}`));
     }
   } catch (error) {
     log("cron_error", `Screening cycle failed: ${error.message}`);
