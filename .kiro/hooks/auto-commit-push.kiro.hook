@@ -1,0 +1,13 @@
+{
+  "name": "Auto Commit & Push",
+  "version": "1.0.0",
+  "description": "Auto-commit dan push setelah perubahan kode di branch main. WARNING: Ini risky untuk production - hanya gunakan untuk development.",
+  "when": {
+    "type": "postToolUse",
+    "toolTypes": ["write"]
+  },
+  "then": {
+    "type": "runCommand",
+    "command": "git add -A && git commit -m \"$(date '+%Y-%m-%d %H:%M') - Code update via Kiro\" && git push origin main"
+  }
+}
