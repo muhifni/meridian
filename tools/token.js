@@ -250,9 +250,13 @@ export async function getTokenHolders({ mint, limit = 20 }) {
     }));
   }
 
+  const feesFromDatapi = tokenInfo?.fees != null ? parseFloat(tokenInfo.fees.toFixed(2)) : null;
+  // Fallback: use OKX total_fee_sol if datapi fails
+  const globalFeesSol = feesFromDatapi ?? advancedData?.total_fee_sol ?? null;
+
   return {
     mint,
-    global_fees_sol: tokenInfo?.fees != null ? parseFloat(tokenInfo.fees.toFixed(2)) : null,
+    global_fees_sol: globalFeesSol,
     total_fetched: holders.length,
     showing: mapped.length,
     top_10_real_holders_pct: top10Pct.toFixed(2),
