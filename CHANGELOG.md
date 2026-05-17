@@ -2,6 +2,22 @@
 
 Semua perubahan penting pada proyek Meridian akan didokumentasikan di file ini.
 
+## [1.6.3] - 2026-05-17
+
+### Fixed
+- `dry-run-simulator.js`: Perbaikan utama PnL simulation - sekarang menggunakan harga real dari Meteora API:
+  1. Prioritas utama: hitung price change dari `initial_price` (saat deploy) ke `current price` dari API
+  2. Fallback ke `price_change_pct` dari API (5m period)
+  3. Fallback ke `stats_1h.price_change` jika tersedia
+  4. Baru gunakan simulasi sebagai last resort
+  5. Logging untuk debugging: `priceSource` sekarang di-log (real_from_api, api_5m, api_1h, simulation)
+  6. Clamp price change ke [-95%, 200%] untuk realistic bounds
+
+### Technical
+- Tambahan return fields: `price_change_pct` dan `price_source` di `_evaluatePosition()` output
+
+---
+
 ## [1.6.2] - 2026-05-17
 
 ### Fixed

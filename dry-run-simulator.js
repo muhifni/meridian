@@ -114,7 +114,7 @@ export function registerVirtualPosition(deployResult, poolCandidate, deployAmoun
   state.positions[positionId] = virtualPos;
   saveState(state);
 
-  log("simulator", `Virtual position registered: ${positionId} | ${virtualPos.pool_name} | ${deployAmount} SOL`);
+  log("simulator", `Virtual position registered: ${positionId} | ${virtualPos.pool_name} | ${deployAmount} SOL | initial_price=${virtualPos.initial_price}`);
   return positionId;
 }
 
@@ -205,17 +205,39 @@ async function _evaluatePosition(pos) {
   const fees_usd = (pos.initial_value_usd ?? 0) * (estimated_fee_pct / 100);
 
   // ── Price change estimation ───────────────────────────────────
-  // Use real price data from pool if available, otherwise simulate.
+  // Priority: 
+  // 1. Real price change from initial_price (stored at deploy) to current price from API
+  // 2. price_change_pct from pool API (last 5m change) as fallback
+  // 3. stats_1h.price_change if available
+  // 4. Simulation as last resort (biased toward realistic behavior)
   let priceChangePct = 0;
-  if (poolData?.price_change_pct != null) {
+  let priceSource = "none";
+
+  // Try to get current price from pool and compute real price change since open
+  const currentPoolPrice = poolData?.price;
+  const initialPrice = pos.initial_price;
+
+  if (currentPoolPrice != null && initialPrice != null && initialPrice > 0) {
+    // Calculate real price change since position was opened
+    priceChangePct = ((currentPoolPrice - initialPrice) / initialPrice) * 100;
+    priceSource = "real_from_api";
+  } else if (poolData?.price_change_pct != null) {
+    // Fallback: use the API's price change (last 5m period)
     priceChangePct = Number(poolData.price_change_pct);
+    priceSource = "api_5m";
   } else if (poolData?.stats_1h?.price_change != null) {
     priceChangePct = Number(poolData.stats_1h.price_change);
+    priceSource = "api_1h";
   } else {
-    // Fallback: unbiased simulation with time-varying seed
-    const volatility = pos.volatility ?? 2;
+    // Last resort: simulation with more realistic parameters
+    // Use pool's volatility to make simulation more accurate
+    const volatility = poolData?.volatility ?? pos.volatility ?? 2;
     priceChangePct = _simulatePriceChange(pos, volatility, minutes_held, now);
+    priceSource = "simulation";
   }
+
+  // Clamp to reasonable bounds (can't lose more than 100% in single-sided LP)
+  priceChangePct = Math.max(-95, Math.min(200, priceChangePct));
 
   // For single-sided SOL bid_ask: IL is asymmetric.
   // Simplified: PnL = fees - IL, where IL ≈ 0.5 * |priceChange| for concentrated liquidity
@@ -270,6 +292,8 @@ async function _evaluatePosition(pos) {
     fees_usd: Math.round(fees_usd * 100) / 100,
     minutes_held, in_range,
     fee_tvl_ratio: currentFeeTvl,
+    price_change_pct: Math.round(priceChangePct * 100) / 100,
+    price_source: priceSource,
   };
 }
 

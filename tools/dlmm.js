@@ -586,6 +586,11 @@ export async function deployPosition({
         amount_x: finalAmountX,
         amount_y: finalAmountY,
         wide_range: totalBins > 69,
+        // Store current price for PnL calculation in dry-run-simulator
+        price: activePrice,
+        active_bin: activeBin?.binId ?? null,
+        lower_bin: minBinId,
+        upper_bin: maxBinId,
       },
       message: "DRY RUN — no transaction sent. Deploy recorded as successful for simulation purposes. Do NOT call deploy_position again.",
     };
